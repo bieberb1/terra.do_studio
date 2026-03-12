@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python src/clean.py)",
+      "Bash(ruff check:*)",
+      "Bash(python -m ruff check src/clean.py)",
+      "Bash(pip install:*)",
+      "Bash(.venv/Scripts/python.exe -m ruff check src/clean.py)",
+      "Read(//c/Users/bbieber/**)",
+      "Bash(ls /c/Users/bbieber/AppData/Local/Programs/Python/*/Scripts/ruff*)",
+      "Bash(ls /c/Users/bbieber/.local/bin/ruff*)",
+      "Bash(.venv/Scripts/ruff check:*)",
+      "Bash(.venv/Scripts/python.exe -c \":*)",
+      "Bash(.venv/Scripts/python.exe src/eda.py)",
+      "Bash(.venv/Scripts/python.exe src/qa.py)",
+      "Bash(.venv/Scripts/pip show:*)",
+      "Bash(python -m pip show plotly)",
+      "Bash(python -m pip show dash)",
+      "Bash(python src/dashboard.py)",
+      "Bash(python -m ruff check src/dashboard.py)",
+      "Bash(python -c \":*)",
+      "Bash(python -m ruff check src/clean.py --fix)",
+      "Bash(sed -i 's/Peak 15-min site energy \\(kWh\\)/Peak 15-min site energy \\(kWh\\\\/sqft\\)/g' src/eda.py)",
+      "Bash(sed -i 's/Total site energy \\(kWh\\)/Total site energy \\(kWh\\\\/sqft\\)/g' src/eda.py)",
+      "Bash(sed -i 's/Peak kWh/Peak kWh\\\\/sqft/g' src/eda.py)",
+      "Bash(sed -i 's/Site energy \\(kWh per 15-min interval\\)/Site energy \\(kWh\\\\/sqft per 15-min interval\\)/g' src/eda.py)",
+      "Bash(sed -i 's/All values in kWh per 15-minute interval/All values in kWh\\\\/sqft per 15-minute interval/g' src/eda.py)",
+      "Bash(sed -i 's/ kWh$/ kWh\\\\/sqft/g' src/eda.py)",
+      "Bash(sed -i 's/kWh per 15-min interval/kWh\\\\/sqft per 15-min interval/g' src/eda.py)",
+      "Bash(sed -i 's/site energy \\(kWh\\) by season/site energy \\(kWh\\\\/sqft\\) by season/g' src/eda.py)",
+      "Bash(sed -i 's/peak=\\\\\\(%\\\\{10\\\\}\\\\,\\\\.1f\\\\\\) kWh/peak=\\\\1 kWh\\\\/sqft/g' src/eda.py)",
+      "Bash(python -m ruff check src/qa.py src/dashboard.py src/eda.py)",
+      "Bash(python src/eda.py)",
+      "Bash(python src/qa.py)",
+      "Bash(python -m ruff check src/eda.py)",
+      "Bash(sed -i 's|kWh/sqft|kWh/1000 sqft|g' src/eda.py src/qa.py src/dashboard.py)",
+      "Bash(sed -i 's|kWh per square foot|kWh per 1000 square feet|g' src/eda.py src/qa.py src/dashboard.py)",
+      "Bash(sed -i 's|kWh/sqft per|kWh/1000 sqft per|g' src/eda.py src/qa.py src/dashboard.py)"
+    ]
+  }
+}

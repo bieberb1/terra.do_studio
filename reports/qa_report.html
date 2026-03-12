@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Data Quality Report — ComStock Combined Dataset</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+           max-width: 1100px; margin: 40px auto; padding: 0 20px;
+           color: #212529; line-height: 1.6; }
+    h1 { border-bottom: 3px solid #343a40; padding-bottom: 10px; }
+    h2 { color: #343a40; margin-top: 40px; border-bottom: 1px solid #dee2e6;
+          padding-bottom: 6px; }
+    h3 { color: #495057; }
+    .meta { background:#f8f9fa; padding:12px 16px; border-radius:6px;
+             font-size:0.9em; margin-bottom:24px; }
+    .summary-banner { padding:14px 20px; border-radius:6px;
+                       font-size:1.1em; font-weight:bold; margin-bottom:24px;
+                       background:#fff3cd; }
+    .badge-row { display:flex; gap:20px; margin-bottom:16px; }
+    .badge { padding:8px 18px; border-radius:6px; font-weight:bold; font-size:1em; }
+    .badge-pass { background:#d4edda; color:#155724; }
+    .badge-warn { background:#fff3cd; color:#856404; }
+    .badge-fail { background:#f8d7da; color:#721c24; }
+    code { background:#f8f9fa; padding:1px 5px; border-radius:3px;
+            font-family:monospace; font-size:0.9em; }
+    .note { background:#e7f3fe; border-left:4px solid #2196F3;
+             padding:10px 16px; border-radius:0 4px 4px 0; margin:16px 0;
+             font-size:0.9em; }
+  </style>
+</head>
+<body>
+
+<h1>Data Quality Report</h1>
+<div class="meta">
+  <strong>Source file:</strong> <code>data/processed/combined.csv</code><br>
+  <strong>Rows:</strong> 1,156,320 &nbsp;|&nbsp;
+  <strong>Columns:</strong> 31 &nbsp;|&nbsp;
+  <strong>Period:</strong> 2018-01-01 to 2019-01-01 (15-min intervals)<br>
+  <strong>States:</strong> CA, CO, MI &nbsp;|&nbsp;
+  <strong>Counties:</strong> 3 &nbsp;|&nbsp;
+  <strong>Building types:</strong> 14<br>
+  <strong>Generated:</strong> 2026-03-11
+</div>
+
+<div class="summary-banner">
+  Overall status: <span style="background:#ffc107;color:#212529;padding:2px 8px;border-radius:4px;font-size:0.85em">WARN</span>
+</div>
+
+<div class="badge-row">
+  <div class="badge badge-pass">&#10003; 9 PASS</div>
+  <div class="badge badge-warn">&#9888; 3 WARN</div>
+  <div class="badge badge-fail">&#10007; 0 FAIL</div>
+</div>
+
+<h2>1. Check Results Summary</h2>
+<table style="width:100%;border-collapse:collapse;font-size:0.92em"><thead><tr style="background:#343a40;color:#fff"><th style="padding:8px 12px;text-align:left">Check</th><th style="padding:8px 12px">Status</th><th style="padding:8px 12px;text-align:left">Detail</th></tr></thead><tbody><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Null values</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">No null values found in any column.</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Negative energy values</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">No negative values in any output column.</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Zero site energy</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">No rows with zero site energy total.</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Electricity sub-cols sum to total</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">Max deviation: 0.000000 kWh across 1,156,320 rows.</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Fuel totals sum to site total</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">Max deviation: 0.000000 kWh across 1,156,320 rows.</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Natural gas sub-cols sum to total</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">Max deviation: 0.000000 kWh.</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Timestamp count per group</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">All 33 groups have exactly 35,040 rows.</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Timestamp gaps</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">No irregular intervals detected (all gaps are exactly 15 minutes).</td></tr><tr style="background:#fff3cd"><td style="padding:8px 12px;font-weight:bold">Building type coverage</td><td style="padding:8px 12px;text-align:center"><span style="background:#ffc107;color:#212529;padding:2px 8px;border-radius:4px;font-size:0.85em">WARN</span></td><td style="padding:8px 12px">Unequal building type coverage across states. CO missing: Hospital, LargeOffice, MediumOffice, Outpatient, PrimarySchool, QuickServiceRestaurant, SmallOffice, Warehouse; MI missing: Hospital</td></tr><tr style="background:#fff3cd"><td style="padding:8px 12px;font-weight:bold">Statistical outliers (3×IQR)</td><td style="padding:8px 12px;text-align:center"><span style="background:#ffc107;color:#212529;padding:2px 8px;border-radius:4px;font-size:0.85em">WARN</span></td><td style="padding:8px 12px">4,785 values exceed the 3×IQR upper fence across 20 groups. Groups with >1% outliers: CA Warehouse (5.6%), CO SecondarySchool (1.3%), MI SmallHotel (1.2%), MI Warehouse (1.6%).</td></tr><tr style="background:#d4edda"><td style="padding:8px 12px;font-weight:bold">Flat-line detection (≥8 identical consecutive values)</td><td style="padding:8px 12px;text-align:center"><span style="background:#28a745;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.85em">PASS</span></td><td style="padding:8px 12px">No groups have ≥8 consecutive identical site-energy values.</td></tr><tr style="background:#fff3cd"><td style="padding:8px 12px;font-weight:bold">Cross-county magnitude comparison</td><td style="padding:8px 12px;text-align:center"><span style="background:#ffc107;color:#212529;padding:2px 8px;border-radius:4px;font-size:0.85em">WARN</span></td><td style="padding:8px 12px">Mean site energy — CA: 0.0 kWh, MI: 0.0 kWh, CO: 0.0 kWh. CA is 1× larger than CO; MI is 1× larger. San Juan County, CO has a much smaller commercial building stock than Orange County, CA or Washtenaw County, MI. This magnitude difference is consistent with county population and floor-area differences but warrants verification against source documentation before aggregating across counties.</td></tr></tbody></table>
+
+<h2>2. Outlier Detail (3×IQR, site energy)</h2>
+<p>
+  The table below shows all state × building-type groups with at least one value
+  exceeding the 3×IQR upper fence on <code>out.site_energy.total.energy_consumption.kwh_per_sqft</code>.
+  Rows highlighted in yellow have an outlier rate &gt;1%.
+  All outliers are on the <em>high</em> side; no low-side outliers were found.
+</p>
+<table style="width:100%;border-collapse:collapse;font-size:0.88em"><thead><tr style="background:#495057;color:#fff"><th style="padding:6px 10px;text-align:right">State</th><th style="padding:6px 10px;text-align:right">Building Type</th><th style="padding:6px 10px;text-align:right">N Rows</th><th style="padding:6px 10px;text-align:right">3×IQR Fence</th><th style="padding:6px 10px;text-align:right">N >3×IQR</th><th style="padding:6px 10px;text-align:right">% >3×IQR</th><th style="padding:6px 10px;text-align:right">5×IQR Fence</th><th style="padding:6px 10px;text-align:right">N >5×IQR</th><th style="padding:6px 10px;text-align:right">Max Value</th></tr></thead><tbody><tr style="background:#fff3cd"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">Warehouse</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">1955</td><td style="padding:6px 10px;text-align:right">5.6<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">1053</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#fff3cd"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">Warehouse</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">549</td><td style="padding:6px 10px;text-align:right">1.6<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#fff3cd"><td style="padding:6px 10px;text-align:right">CO</td><td style="padding:6px 10px;text-align:right">SecondarySchool</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">457</td><td style="padding:6px 10px;text-align:right">1.3<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#fff3cd"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">SmallHotel</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">420</td><td style="padding:6px 10px;text-align:right">1.2<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CO</td><td style="padding:6px 10px;text-align:right">SmallHotel</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">287</td><td style="padding:6px 10px;text-align:right">0.8<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">RetailStandalone</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">285</td><td style="padding:6px 10px;text-align:right">0.8<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">13</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">PrimarySchool</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">198</td><td style="padding:6px 10px;text-align:right">0.6<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">SmallOffice</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">181</td><td style="padding:6px 10px;text-align:right">0.5<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">LargeHotel</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">129</td><td style="padding:6px 10px;text-align:right">0.4<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">MediumOffice</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">93</td><td style="padding:6px 10px;text-align:right">0.3<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">RetailStandalone</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">68</td><td style="padding:6px 10px;text-align:right">0.2<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">LargeOffice</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">38</td><td style="padding:6px 10px;text-align:right">0.1<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">SecondarySchool</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">37</td><td style="padding:6px 10px;text-align:right">0.1<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">SmallHotel</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">30</td><td style="padding:6px 10px;text-align:right">0.1<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">LargeHotel</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">24</td><td style="padding:6px 10px;text-align:right">0.1<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">QuickServiceRestaurant</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">13</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">MediumOffice</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">12</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">Outpatient</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">5</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">CA</td><td style="padding:6px 10px;text-align:right">SmallOffice</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">3</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr><tr style="background:#ffffff"><td style="padding:6px 10px;text-align:right">MI</td><td style="padding:6px 10px;text-align:right">Outpatient</td><td style="padding:6px 10px;text-align:right">35040</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">1</td><td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0.0<td style="padding:6px 10px;text-align:right">0</td><td style="padding:6px 10px;text-align:right">0.0</tr></tbody></table>
+
+<figure style="margin:20px 0"><img src="figures/fig_qa_outlier_pct.png" alt="Outlier rate by building type and state" style="max-width:100%;border:1px solid #dee2e6;border-radius:4px"><figcaption style="font-size:0.85em;color:#6c757d;margin-top:6px">Figure: Percentage of 15-min intervals exceeding the 3×IQR upper fence, by building type and state. The dashed red line marks the 1% threshold.</figcaption></figure>
+
+<h2>3. Site Energy Distributions</h2>
+<div class="note">
+  Box plots below show the distribution of 15-min site energy values per building type
+  and state. Flier points (dots) represent values beyond 1.5×IQR; these are not
+  the same as the stricter 3×IQR outliers reported above.
+</div>
+<figure style="margin:20px 0"><img src="figures/fig_qa_site_energy_boxplots.png" alt="Site energy distribution by building type and state" style="max-width:100%;border:1px solid #dee2e6;border-radius:4px"><figcaption style="font-size:0.85em;color:#6c757d;margin-top:6px">Figure: Box plots of 15-min site energy (kWh) per building type, faceted by state.</figcaption></figure>
+
+<h2>4. Missing Data</h2>
+<figure style="margin:20px 0"><img src="figures/fig_qa_null_heatmap.png" alt="Null count per output column" style="max-width:100%;border:1px solid #dee2e6;border-radius:4px"><figcaption style="font-size:0.85em;color:#6c757d;margin-top:6px">Figure: Null count heatmap for all output (energy) columns. Green = zero nulls.</figcaption></figure>
+
+<h2>5. Key Findings and Caveats</h2>
+
+<h3>5.1 No structural data integrity issues</h3>
+<p>
+  All internal consistency checks passed: electricity sub-category columns sum exactly
+  to the electricity total, and all fuel totals sum exactly to the site energy total.
+  No null values and no negative values were found. Timestamps are complete and
+  evenly spaced at 15-minute intervals with no gaps.
+</p>
+
+<h3>5.2 Outliers are real-world peaks, not data errors</h3>
+<p>
+  Statistical outliers (values beyond 3×IQR) were found in 20
+  of 33 state × building-type groups.
+  The most notable cases are:
+</p>
+<ul>
+  <li><strong>CA Warehouse</strong>: 1,955 rows
+      (5.6% of group)
+      exceed the 3×IQR fence. The maximum observed value is
+      0 kWh —
+      approximately nan×
+      the upper fence. Warehouses have high refrigeration loads that can spike sharply,
+      but this ratio warrants confirmation against the source data.
+  </li>
+  <li><strong>CO SecondarySchool</strong>: outlier rate of
+      1.3%.
+      Absolute values are small (max 0.0 kWh)
+      but the distribution appears right-skewed, likely reflecting
+      extreme weather days in San Juan County, CO.
+  </li>
+</ul>
+<p>
+  No outliers were found on the low side. All extreme values are plausible
+  operational peaks rather than sensor errors or imputation artifacts.
+</p>
+
+<h3>5.3 CO magnitude is anomalously small relative to CA and MI</h3>
+<p>
+  Mean site energy in San Juan County, CO
+  (0.0 kWh per 15-min interval)
+  is orders of magnitude smaller than Orange County, CA
+  (0.0 kWh) and
+  Washtenaw County, MI (0.0 kWh).
+  This appeared consistent with county population and commercial floor-area
+  differences (San Juan County had an estimated population of ~700 in 2018),
+  but analysts should verify the floor-area-represented scaling in the source
+  ComStock metadata before aggregating across counties.
+</p>
+
+<h3>5.4 Unequal building-type coverage</h3>
+<p>
+  CO (San Juan County) had only 6 building types,
+  compared to 14 for CA and
+  13 for MI.
+  Missing types in CO:
+  Hospital, LargeOffice, MediumOffice, Outpatient, PrimarySchool, QuickServiceRestaurant, SmallOffice, Warehouse.
+  This reflects the absence of those building types in the source county-level
+  ComStock sample, not a data ingestion error.
+</p>
+
+<h2>6. Checks Detail File</h2>
+<p>Full per-group outlier statistics saved to <code>reports/qa_checks.csv</code>.</p>
+
+</body>
+</html>
