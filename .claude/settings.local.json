@@ -35,7 +35,10 @@
       "Bash(python -m ruff check src/eda.py)",
       "Bash(sed -i 's|kWh/sqft|kWh/1000 sqft|g' src/eda.py src/qa.py src/dashboard.py)",
       "Bash(sed -i 's|kWh per square foot|kWh per 1000 square feet|g' src/eda.py src/qa.py src/dashboard.py)",
-      "Bash(sed -i 's|kWh/sqft per|kWh/1000 sqft per|g' src/eda.py src/qa.py src/dashboard.py)"
+      "Bash(sed -i 's|kWh/sqft per|kWh/1000 sqft per|g' src/eda.py src/qa.py src/dashboard.py)",
+      "Bash(python -m ruff check src/qa.py src/dashboard.py)",
+      "Bash(ls -la \"c:\\\\Users\\\\bbieber\\\\GitHub\\\\terra.do_studio\"\" 2>/dev/null | grep -E \"^d \")",
+      "Bash(python -m ruff check src/clean.py src/eda.py src/qa.py src/dashboard.py)"
     ]
   }
 }

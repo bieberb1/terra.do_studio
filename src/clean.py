@@ -3,14 +3,16 @@ Combine raw ComStock CSV files and produce cleaned output files.
 
 Reads all CSVs from data/raw/<STATE>_<GISJOIN>/upgrade_<id>/*.csv,
 adds a 'state' column derived from the folder name, normalises all energy
-consumption columns to kWh per square foot by dividing by
+consumption columns to kWh per 1000 square feet by dividing by
 floor_area_represented, and writes:
 
-    data/processed/combined.csv       — all timesteps
+    data/processed/combined.csv       — all timesteps, all upgrades
     data/processed/combined_dec1_3.csv — December 1–3 only
 
-Retained columns: state, in.county, in.comstock_building_type, timestamp,
-floor_area_represented, plus all energy intensity columns (kwh_per_sqft).
+Retained columns: state, upgrade, in.county, in.comstock_building_type,
+timestamp, floor_area_represented, plus all energy intensity columns
+(kwh_per_1000sqft).  The 'upgrade' column carries the scenario ID from
+the raw CSV (0 = baseline, 36 = Package 3).
 
 Normalisation note
 ------------------
@@ -39,7 +41,7 @@ OUTPUT_ALL = os.path.join(PROCESSED_DIR, "combined.csv")
 OUTPUT_DEC = os.path.join(PROCESSED_DIR, "combined_dec1_3.csv")
 
 # Columns to retain (plus floor_area_represented and all out.* energy columns)
-ID_COLS = ["state", "in.county", "in.comstock_building_type", "timestamp"]
+ID_COLS = ["state", "upgrade", "in.county", "in.comstock_building_type", "timestamp"]
 FLOOR_AREA_COL = "floor_area_represented"
 
 # December 1–3 filter (inclusive, any year)
@@ -116,7 +118,8 @@ def main():
     # ------------------------------------------------------------------
     combined["timestamp"] = pd.to_datetime(combined["timestamp"])
 
-    energy_cols = [c for c in combined.columns if c.startswith("out.")]
+    # Exclude *.savings columns from upgrade_36 — keep only base energy columns
+    energy_cols = [c for c in combined.columns if c.startswith("out.") and not c.endswith(".savings")]
     keep_cols = ID_COLS + [FLOOR_AREA_COL] + energy_cols
     missing_keep = [c for c in keep_cols if c not in combined.columns]
     if missing_keep:
@@ -146,9 +149,9 @@ def main():
 
     print(f"Normalised {len(rename_map)} energy columns by {FLOOR_AREA_COL} (kWh -> kWh/1000sqft)")
     print("  Sample floor areas (first row per group):")
-    sample = combined.groupby(["state", "in.comstock_building_type"])[FLOOR_AREA_COL].first()
-    for (state, btype), val in sample.items():
-        print(f"    {state} {btype}: {val:,.0f} sqft")
+    sample = combined.groupby(["state", "upgrade", "in.comstock_building_type"])[FLOOR_AREA_COL].first()
+    for (state, upgrade, btype), val in sample.items():
+        print(f"    {state} upgrade={upgrade} {btype}: {val:,.0f} sqft")
     print()
 
     # ------------------------------------------------------------------

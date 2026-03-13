@@ -34,9 +34,14 @@ COUNTY_COL = "in.county"
 
 COUNTY_LABELS = {
     "G0600590": "Orange Co, CA",
-    "G0801110": "San Juan Co, CO",
+    "G0800310": "Denver Co, CO",
     "G2601610": "Washtenaw Co, MI",
 }
+
+UPGRADE_COL = "upgrade"
+UPGRADE_LABELS = {0: "Baseline", 36: "Package 3"}
+UPGRADE_DASH = {0: "solid", 36: "dash"}
+UPGRADE_OPACITY = {0: 0.85, 36: 0.55}
 
 STATE_COLORS = {
     "CA": "#1f77b4",
@@ -70,6 +75,7 @@ def load_data() -> pd.DataFrame:
     null_counts = df.isnull().sum()
     print(f"  Null counts: {null_counts[null_counts > 0].to_dict() or 'none'}")
     df["county_label"] = df[COUNTY_COL].map(COUNTY_LABELS)
+    df["upgrade_label"] = df[UPGRADE_COL].map(UPGRADE_LABELS)
     df["month"] = df["timestamp"].dt.month
     df["hour"] = df["timestamp"].dt.hour
     df["date"] = df["timestamp"].dt.date.astype(str)
@@ -84,7 +90,7 @@ def load_data() -> pd.DataFrame:
 
 def chart_peak_by_building(df: pd.DataFrame) -> go.Figure:
     peak = (
-        df.groupby(["county_label", BTYPE_COL])[SITE_COL]
+        df.groupby(["county_label", UPGRADE_COL, BTYPE_COL])[SITE_COL]
         .max()
         .reset_index()
         .rename(columns={SITE_COL: "peak_kwh"})
@@ -95,30 +101,36 @@ def chart_peak_by_building(df: pd.DataFrame) -> go.Figure:
 
     fig = go.Figure()
     for county in counties:
-        sub = peak[peak["county_label"] == county].set_index(BTYPE_COL)
         state = state_map[county]
-        fig.add_trace(go.Bar(
-            name=county,
-            x=btypes,
-            y=[sub.loc[b, "peak_kwh"] if b in sub.index else 0 for b in btypes],
-            marker_color=STATE_COLORS[state],
-            hovertemplate=(
-                "<b>%{x}</b><br>"
-                f"County: {county}<br>"
-                "Peak 15-min site energy: %{y:,.1f} kWh<extra></extra>"
-            ),
-        ))
+        for upgrade_id in sorted(df[UPGRADE_COL].unique()):
+            ulabel = UPGRADE_LABELS[upgrade_id]
+            sub = peak[
+                (peak["county_label"] == county) & (peak[UPGRADE_COL] == upgrade_id)
+            ].set_index(BTYPE_COL)
+            fig.add_trace(go.Bar(
+                name=f"{county} — {ulabel}",
+                x=btypes,
+                y=[sub.loc[b, "peak_kwh"] if b in sub.index else 0 for b in btypes],
+                marker_color=STATE_COLORS[state],
+                opacity=UPGRADE_OPACITY[upgrade_id],
+                meta={"upgrade": upgrade_id},
+                hovertemplate=(
+                    "<b>%{x}</b><br>"
+                    f"County: {county} ({ulabel})<br>"
+                    "Peak 15-min site energy: %{y:.2f} kWh/1000 sqft<extra></extra>"
+                ),
+            ))
 
     fig.update_layout(
-        title="Peak 15-min Site Energy by Building Type and County",
+        title="Peak 15-min Site Energy by Building Type, County, and Scenario",
         barmode="group",
         xaxis_title="Building Type",
-        yaxis_title="Peak 15-min site energy (kWh)",
-        legend_title="County",
+        yaxis_title="Peak 15-min site energy (kWh/1000 sqft)",
+        legend_title="County / Scenario",
         xaxis_tickangle=-35,
-        yaxis_tickformat=",.0f",
+        yaxis_tickformat=".2f",
         template="plotly_white",
-        height=480,
+        height=500,
     )
     return fig
 
@@ -130,7 +142,7 @@ def chart_peak_by_building(df: pd.DataFrame) -> go.Figure:
 
 def chart_daily_timeseries(df: pd.DataFrame) -> go.Figure:
     daily = (
-        df.groupby(["state", "date"])[SITE_COL]
+        df.groupby(["state", UPGRADE_COL, "date"])[SITE_COL]
         .sum()
         .reset_index()
         .rename(columns={SITE_COL: "daily_kwh"})
@@ -139,55 +151,67 @@ def chart_daily_timeseries(df: pd.DataFrame) -> go.Figure:
 
     btypes = sorted(df[BTYPE_COL].unique())
     states = sorted(df["state"].unique())
+    upgrade_ids = sorted(df[UPGRADE_COL].unique())
 
-    # Base figure: one line per state (all buildings summed)
+    # Base figure: one line per state × upgrade (all buildings summed)
     fig = go.Figure()
     for state in states:
-        sub = daily[daily["state"] == state].sort_values("date_dt")
-        fig.add_trace(go.Scatter(
-            x=sub["date_dt"],
-            y=sub["daily_kwh"],
-            name=state,
-            mode="lines",
-            line={"color": STATE_COLORS[state], "width": 1.5},
-            hovertemplate="<b>%{x|%b %d}</b><br>Daily site energy: %{y:,.0f} kWh<extra></extra>",
-        ))
+        for upgrade_id in upgrade_ids:
+            ulabel = UPGRADE_LABELS[upgrade_id]
+            sub = daily[
+                (daily["state"] == state) & (daily[UPGRADE_COL] == upgrade_id)
+            ].sort_values("date_dt")
+            fig.add_trace(go.Scatter(
+                x=sub["date_dt"],
+                y=sub["daily_kwh"],
+                name=f"{state} — {ulabel}",
+                mode="lines",
+                line={"color": STATE_COLORS[state], "width": 1.5,
+                      "dash": UPGRADE_DASH[upgrade_id]},
+                opacity=UPGRADE_OPACITY[upgrade_id],
+                meta={"upgrade": upgrade_id},
+                hovertemplate=f"<b>%{{x|%b %d}}</b> ({ulabel})<br>Daily site energy: %{{y:,.2f}} kWh/1000 sqft<extra></extra>",
+            ))
 
     # Hidden per-building traces for dropdown
+    n_base = len(states) * len(upgrade_ids)
     for btype in btypes:
         sub_b = (
             df[df[BTYPE_COL] == btype]
-            .groupby(["state", "date"])[SITE_COL]
+            .groupby(["state", UPGRADE_COL, "date"])[SITE_COL]
             .sum()
             .reset_index()
         )
         sub_b["date_dt"] = pd.to_datetime(sub_b["date"])
         for state in states:
-            s = sub_b[sub_b["state"] == state].sort_values("date_dt")
-            fig.add_trace(go.Scatter(
-                x=s["date_dt"],
-                y=s[SITE_COL],
-                name=f"{state} — {btype}",
-                mode="lines",
-                line={"color": STATE_COLORS[state], "width": 1.5, "dash": "dot"},
-                visible=False,
-                hovertemplate=(
-                    f"<b>%{{x|%b %d}}</b><br>{btype}<br>"
-                    "Daily site energy: %{y:,.0f} kWh<extra></extra>"
-                ),
-            ))
+            for upgrade_id in upgrade_ids:
+                ulabel = UPGRADE_LABELS[upgrade_id]
+                s = sub_b[
+                    (sub_b["state"] == state) & (sub_b[UPGRADE_COL] == upgrade_id)
+                ].sort_values("date_dt")
+                fig.add_trace(go.Scatter(
+                    x=s["date_dt"],
+                    y=s[SITE_COL],
+                    name=f"{state} — {btype} ({ulabel})",
+                    mode="lines",
+                    line={"color": STATE_COLORS[state], "width": 1.5,
+                          "dash": UPGRADE_DASH[upgrade_id]},
+                    opacity=UPGRADE_OPACITY[upgrade_id],
+                    visible=False,
+                    meta={"upgrade": upgrade_id},
+                    hovertemplate=(
+                        f"<b>%{{x|%b %d}}</b><br>{btype} ({ulabel})<br>"
+                        "Daily site energy: %{y:,.2f} kWh/1000 sqft<extra></extra>"
+                    ),
+                ))
 
-    n_states = len(states)
+    n_per_btype = len(states) * len(upgrade_ids)
     n_btypes = len(btypes)
 
     def visibility_for(selected_btype_idx: int | None) -> list:
-        """Return visibility list: show base traces OR one building's traces."""
-        vis = []
-        for _ in range(n_states):
-            vis.append(selected_btype_idx is None)
+        vis = [selected_btype_idx is None] * n_base
         for bi in range(n_btypes):
-            for _ in range(n_states):
-                vis.append(bi == selected_btype_idx)
+            vis += [bi == selected_btype_idx] * n_per_btype
         return vis
 
     buttons = [
@@ -204,12 +228,12 @@ def chart_daily_timeseries(df: pd.DataFrame) -> go.Figure:
         })
 
     fig.update_layout(
-        title="Daily Site Energy — All Buildings by State",
+        title="Daily Site Energy — All Buildings by State and Scenario",
         xaxis_title="Date",
-        yaxis_title="Daily site energy (kWh)",
-        yaxis_tickformat=",.0f",
+        yaxis_title="Daily site energy (kWh/1000 sqft)",
+        yaxis_tickformat=",.2f",
         template="plotly_white",
-        height=460,
+        height=480,
         xaxis={"rangeslider": {"visible": True}, "type": "date"},
         updatemenus=[{
             "buttons": buttons,
@@ -291,60 +315,73 @@ def chart_hourly_heatmap(df: pd.DataFrame) -> go.Figure:
 def chart_monthly_by_building(df: pd.DataFrame) -> go.Figure:
     states = sorted(df["state"].unique())
     btypes = sorted(df[BTYPE_COL].unique())
+    upgrade_ids = sorted(df[UPGRADE_COL].unique())
 
     monthly = (
-        df.groupby(["state", BTYPE_COL, "month"])[SITE_COL]
+        df.groupby(["state", UPGRADE_COL, BTYPE_COL, "month"])[SITE_COL]
         .sum()
         .reset_index()
     )
     monthly["month_abbr"] = monthly["month"].map(MONTH_ABBR)
-
     month_order = [MONTH_ABBR[m] for m in range(1, 13)]
 
     fig = go.Figure()
 
-    # One visible trace per state (all btypes summed)
-    all_monthly = df.groupby(["state", "month"])[SITE_COL].sum().reset_index()
+    # Visible traces: one per state × upgrade (all btypes summed)
+    all_monthly = df.groupby(["state", UPGRADE_COL, "month"])[SITE_COL].sum().reset_index()
     all_monthly["month_abbr"] = all_monthly["month"].map(MONTH_ABBR)
 
     for state in states:
-        sub = all_monthly[all_monthly["state"] == state].set_index("month_abbr")
-        fig.add_trace(go.Scatter(
-            x=month_order,
-            y=[sub.loc[m, SITE_COL] if m in sub.index else 0 for m in month_order],
-            name=state,
-            mode="lines+markers",
-            line={"color": STATE_COLORS[state], "width": 2},
-            marker={"size": 7},
-            hovertemplate="<b>%{x}</b><br>%{y:,.0f} kWh<extra></extra>",
-        ))
-
-    # Per-building hidden traces
-    for btype in btypes:
-        for state in states:
-            sub = monthly[(monthly[BTYPE_COL] == btype) & (monthly["state"] == state)]
-            sub_idx = sub.set_index("month_abbr")
+        for upgrade_id in upgrade_ids:
+            ulabel = UPGRADE_LABELS[upgrade_id]
+            sub = all_monthly[
+                (all_monthly["state"] == state) & (all_monthly[UPGRADE_COL] == upgrade_id)
+            ].set_index("month_abbr")
             fig.add_trace(go.Scatter(
                 x=month_order,
-                y=[sub_idx.loc[m, SITE_COL] if m in sub_idx.index else 0 for m in month_order],
-                name=f"{state}",
+                y=[sub.loc[m, SITE_COL] if m in sub.index else 0 for m in month_order],
+                name=f"{state} — {ulabel}",
                 mode="lines+markers",
-                line={"color": STATE_COLORS[state], "width": 2, "dash": "dot"},
+                line={"color": STATE_COLORS[state], "width": 2,
+                      "dash": UPGRADE_DASH[upgrade_id]},
                 marker={"size": 7},
-                visible=False,
-                hovertemplate="<b>%{x}</b><br>%{y:,.0f} kWh<extra></extra>",
+                opacity=UPGRADE_OPACITY[upgrade_id],
+                meta={"upgrade": upgrade_id},
+                hovertemplate=f"<b>%{{x}}</b> ({ulabel})<br>%{{y:,.2f}} kWh/1000 sqft<extra></extra>",
             ))
 
-    n_states = len(states)
+    # Per-building hidden traces
+    n_base = len(states) * len(upgrade_ids)
+    for btype in btypes:
+        for state in states:
+            for upgrade_id in upgrade_ids:
+                ulabel = UPGRADE_LABELS[upgrade_id]
+                sub = monthly[
+                    (monthly[BTYPE_COL] == btype)
+                    & (monthly["state"] == state)
+                    & (monthly[UPGRADE_COL] == upgrade_id)
+                ].set_index("month_abbr")
+                fig.add_trace(go.Scatter(
+                    x=month_order,
+                    y=[sub.loc[m, SITE_COL] if m in sub.index else 0 for m in month_order],
+                    name=f"{state} — {ulabel}",
+                    mode="lines+markers",
+                    line={"color": STATE_COLORS[state], "width": 2,
+                          "dash": UPGRADE_DASH[upgrade_id]},
+                    marker={"size": 7},
+                    visible=False,
+                    opacity=UPGRADE_OPACITY[upgrade_id],
+                    meta={"upgrade": upgrade_id},
+                    hovertemplate=f"<b>%{{x}}</b> ({ulabel})<br>%{{y:,.2f}} kWh/1000 sqft<extra></extra>",
+                ))
+
+    n_per_btype = len(states) * len(upgrade_ids)
     n_btypes = len(btypes)
 
     def vis(bi):
-        v = []
-        for _ in range(n_states):
-            v.append(bi is None)
+        v = [bi is None] * n_base
         for b_idx in range(n_btypes):
-            for _ in range(n_states):
-                v.append(b_idx == bi)
+            v += [b_idx == bi] * n_per_btype
         return v
 
     buttons = [{"label": "All buildings", "method": "update",
@@ -358,12 +395,12 @@ def chart_monthly_by_building(df: pd.DataFrame) -> go.Figure:
         })
 
     fig.update_layout(
-        title="Monthly Total Site Energy — All Buildings",
+        title="Monthly Total Site Energy — All Buildings by Scenario",
         xaxis_title="Month",
-        yaxis_title="Total site energy (kWh)",
-        yaxis_tickformat=",.0f",
+        yaxis_title="Total site energy (kWh/1000 sqft)",
+        yaxis_tickformat=",.2f",
         template="plotly_white",
-        height=450,
+        height=470,
         updatemenus=[{
             "buttons": buttons,
             "direction": "down",
@@ -392,33 +429,39 @@ def chart_energy_mix(df: pd.DataFrame) -> go.Figure:
     }
 
     counties = list(COUNTY_LABELS.values())
+    upgrade_ids = sorted(df[UPGRADE_COL].unique())
+    x_labels = [f"{c}<br>{UPGRADE_LABELS[u]}" for c in counties for u in upgrade_ids]
+
     fig = go.Figure()
     for fuel, col in fuel_map.items():
-        vals = [
-            df[df["county_label"] == c][col].sum() if col in df.columns else 0
-            for c in counties
-        ]
+        vals = []
+        for c in counties:
+            for upgrade_id in upgrade_ids:
+                vals.append(
+                    df[(df["county_label"] == c) & (df[UPGRADE_COL] == upgrade_id)][col].sum()
+                    if col in df.columns else 0
+                )
         fig.add_trace(go.Bar(
             name=fuel,
-            x=counties,
+            x=x_labels,
             y=vals,
             marker_color=FUEL_COLORS[fuel],
             hovertemplate=(
                 f"<b>{fuel}</b><br>"
-                "County: %{x}<br>"
-                "Annual total: %{y:,.0f} kWh<extra></extra>"
+                "County/Scenario: %{x}<br>"
+                "Annual total: %{y:,.2f} kWh/1000 sqft<extra></extra>"
             ),
         ))
 
     fig.update_layout(
-        title="Annual Energy Mix by County (2018)",
+        title="Annual Energy Mix by County and Scenario (2018)",
         barmode="stack",
-        xaxis_title="County",
-        yaxis_title="Annual energy consumption (kWh)",
-        yaxis_tickformat=",.0f",
+        xaxis_title="County / Scenario",
+        yaxis_title="Annual energy consumption (kWh/1000 sqft)",
+        yaxis_tickformat=",.2f",
         legend_title="Fuel Type",
         template="plotly_white",
-        height=450,
+        height=470,
     )
     return fig
 
@@ -431,37 +474,44 @@ def chart_energy_mix(df: pd.DataFrame) -> go.Figure:
 def chart_top_peaks(df: pd.DataFrame) -> go.Figure:
     top = df.nlargest(50, SITE_COL).copy()
     top["county_label"] = top[COUNTY_COL].map(COUNTY_LABELS)
+    top["upgrade_label"] = top[UPGRADE_COL].map(UPGRADE_LABELS)
     top["label"] = (
         top[BTYPE_COL] + " — " + top["county_label"]
+        + " (" + top["upgrade_label"] + ")"
         + "<br>" + top["timestamp"].dt.strftime("%b %d, %H:%M")
     )
 
     fig = go.Figure()
     for state in sorted(top["state"].unique()):
-        sub = top[top["state"] == state]
-        fig.add_trace(go.Scatter(
-            x=sub["timestamp"],
-            y=sub[SITE_COL],
-            mode="markers",
-            name=state,
-            marker={
-                "size": 10,
-                "color": STATE_COLORS[state],
-                "symbol": "circle",
-                "opacity": 0.8,
-            },
-            hovertemplate=(
-                "%{customdata}<br>"
-                "Site energy: %{y:,.1f} kWh<extra></extra>"
-            ),
-            customdata=sub["label"],
-        ))
+        for upgrade_id in sorted(top[UPGRADE_COL].unique()):
+            ulabel = UPGRADE_LABELS[upgrade_id]
+            sub = top[(top["state"] == state) & (top[UPGRADE_COL] == upgrade_id)]
+            if sub.empty:
+                continue
+            fig.add_trace(go.Scatter(
+                x=sub["timestamp"],
+                y=sub[SITE_COL],
+                mode="markers",
+                name=f"{state} — {ulabel}",
+                marker={
+                    "size": 10,
+                    "color": STATE_COLORS[state],
+                    "symbol": "circle" if upgrade_id == 0 else "diamond",
+                    "opacity": UPGRADE_OPACITY[upgrade_id],
+                },
+                meta={"upgrade": upgrade_id},
+                hovertemplate=(
+                    "%{customdata}<br>"
+                    "Site energy: %{y:.2f} kWh/1000 sqft<extra></extra>"
+                ),
+                customdata=sub["label"],
+            ))
 
     fig.update_layout(
         title="Top 50 Peak 15-min Site Energy Intervals",
         xaxis_title="Date",
-        yaxis_title="Site energy (kWh per 15-min interval)",
-        yaxis_tickformat=",.0f",
+        yaxis_title="Site energy (kWh/1000 sqft per 15-min interval)",
+        yaxis_tickformat=".2f",
         template="plotly_white",
         height=450,
         legend_title="State",
@@ -476,13 +526,15 @@ def chart_top_peaks(df: pd.DataFrame) -> go.Figure:
 
 def compute_kpis(df: pd.DataFrame) -> dict:
     peak_row = df.loc[df[SITE_COL].idxmax()]
+    upgrades = sorted(df[UPGRADE_COL].unique())
     return {
         "total_rows": f"{len(df):,}",
         "date_range": f"{df['timestamp'].min().strftime('%b %d, %Y')} – {df['timestamp'].max().strftime('%b %d, %Y')}",
         "n_building_types": str(df[BTYPE_COL].nunique()),
         "n_counties": str(df[COUNTY_COL].nunique()),
-        "peak_val": f"{peak_row[SITE_COL]:,.0f} kWh",
-        "peak_where": f"{peak_row[BTYPE_COL]}, {COUNTY_LABELS.get(peak_row[COUNTY_COL], peak_row[COUNTY_COL])}",
+        "scenarios": " | ".join(UPGRADE_LABELS.get(u, str(u)) for u in upgrades),
+        "peak_val": f"{peak_row[SITE_COL]:.2f} kWh/1000 sqft",
+        "peak_where": f"{peak_row[BTYPE_COL]}, {COUNTY_LABELS.get(peak_row[COUNTY_COL], peak_row[COUNTY_COL])} ({UPGRADE_LABELS.get(peak_row[UPGRADE_COL], str(peak_row[UPGRADE_COL]))})",
         "peak_when": peak_row["timestamp"].strftime("%b %d, %H:%M"),
         "null_count": str(int(df.isnull().sum().sum())),
     }
@@ -513,10 +565,10 @@ def build_html(
             ("Date range", kpis["date_range"]),
             ("Building types", kpis["n_building_types"]),
             ("Counties", kpis["n_counties"]),
+            ("Scenarios", kpis["scenarios"]),
             ("Overall peak", kpis["peak_val"]),
             ("Peak location", kpis["peak_where"]),
             ("Peak time", kpis["peak_when"]),
-            ("Null values", kpis["null_count"]),
         ]
     )
 
@@ -632,6 +684,30 @@ def build_html(
     .tab-panel {{ display: none; }}
     .tab-panel.active {{ display: block; }}
 
+    .upgrade-filter {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 32px 0;
+    }}
+    .filter-label {{ font-size: 0.88em; color: #495057; font-weight: 600; }}
+    .upg-btn {{
+      padding: 5px 14px;
+      border: 1px solid #dee2e6;
+      background: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+      color: #495057;
+    }}
+    .upg-btn:hover {{ background: #e9ecef; }}
+    .upg-btn.active {{
+      background: #1a1a2e;
+      color: #fff;
+      border-color: #1a1a2e;
+      font-weight: 600;
+    }}
+
     footer {{
       text-align: center;
       padding: 16px;
@@ -652,6 +728,13 @@ def build_html(
 
 <div class="kpi-row">
   {kpi_cards}
+</div>
+
+<div class="upgrade-filter">
+  <span class="filter-label">Scenario filter:</span>
+  <button class="upg-btn active" onclick="filterUpgrade('all')">All</button>
+  <button class="upg-btn" onclick="filterUpgrade(0)">Baseline</button>
+  <button class="upg-btn" onclick="filterUpgrade(36)">Package 3</button>
 </div>
 
 <div class="tab-bar">
@@ -679,6 +762,21 @@ function showTab(tabId) {{
   const plotDivId = 'plot-' + tabId.replace('tab-', '');
   const plotDiv = document.getElementById(plotDivId);
   if (plotDiv && plotDiv.data) Plotly.relayout(plotDiv, {{}});
+}}
+
+function filterUpgrade(upgradeValue) {{
+  document.querySelectorAll('.upg-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const plotKeys = {json.dumps([key for _, _, key in tab_defs])};
+  plotKeys.forEach(key => {{
+    const div = document.getElementById('plot-' + key);
+    if (!div || !div.data) return;
+    const newVisible = div.data.map(trace => {{
+      if (upgradeValue === 'all') return true;
+      return trace.meta && trace.meta.upgrade === upgradeValue;
+    }});
+    Plotly.restyle('plot-' + key, {{visible: newVisible}});
+  }});
 }}
 
 // Render all figures on load

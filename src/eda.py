@@ -35,9 +35,14 @@ COUNTY_COL = "in.county"
 
 COUNTY_LABELS = {
     "G0600590": "Orange Co, CA",
-    "G0801110": "San Juan Co, CO",
+    "G0800310": "Denver Co, CO",
     "G2601610": "Washtenaw Co, MI",
 }
+
+UPGRADE_COL = "upgrade"
+UPGRADE_LABELS = {0: "Baseline", 36: "Package 3"}
+UPGRADE_DASH = {0: "solid", 36: "dash"}
+UPGRADE_OPACITY = {0: 0.85, 36: 0.55}
 
 STATE_COLORS = {
     "CA": "#1f77b4",
@@ -73,6 +78,7 @@ def load_data() -> pd.DataFrame:
     print(f"  Null counts: {null_counts[null_counts > 0].to_dict() or 'none'}")
 
     df["county_label"] = df[COUNTY_COL].map(COUNTY_LABELS)
+    df["upgrade_label"] = df[UPGRADE_COL].map(UPGRADE_LABELS)
     df["month"] = df["timestamp"].dt.month
     df["hour"] = df["timestamp"].dt.hour
     df["season"] = df["month"].map(
@@ -91,12 +97,13 @@ def load_data() -> pd.DataFrame:
 
 def compute_stats(df: pd.DataFrame) -> pd.DataFrame:
     stats = (
-        df.groupby(["state", COUNTY_COL, BTYPE_COL])[SITE_COL]
+        df.groupby(["state", UPGRADE_COL, COUNTY_COL, BTYPE_COL])[SITE_COL]
         .agg(mean_kwh_per_1000sqft="mean", peak_kwh_per_1000sqft="max",
              total_kwh_per_1000sqft="sum", p95_kwh_per_1000sqft=lambda x: x.quantile(0.95))
         .reset_index()
     )
     stats["county_label"] = stats[COUNTY_COL].map(COUNTY_LABELS)
+    stats["upgrade_label"] = stats[UPGRADE_COL].map(UPGRADE_LABELS)
     stats.to_csv(STATS_CSV, index=False)
     print(f"Saved stats -> {STATS_CSV}")
     return stats
@@ -108,45 +115,50 @@ def compute_stats(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fig_peak_by_building(df: pd.DataFrame) -> go.Figure:
-    """Grouped bar: peak 15-min site energy per building type by county."""
+    """Grouped bar: peak 15-min site energy per building type by county × upgrade."""
     peak = (
-        df.groupby(["county_label", BTYPE_COL])[SITE_COL]
+        df.groupby(["county_label", "upgrade_label", BTYPE_COL])[SITE_COL]
         .max()
         .reset_index()
     )
     btypes = sorted(df[BTYPE_COL].unique())
     counties = list(COUNTY_LABELS.values())
     state_map = dict(zip(counties, ["CA", "CO", "MI"]))
+    upgrade_labels = [UPGRADE_LABELS[u] for u in sorted(UPGRADE_LABELS)]
 
     fig = go.Figure()
     for county in counties:
-        sub = peak[peak["county_label"] == county].set_index(BTYPE_COL)
         state = state_map[county]
-        fig.add_trace(go.Bar(
-            name=county,
-            x=btypes,
-            y=[sub.loc[b, SITE_COL] if b in sub.index else 0 for b in btypes],
-            marker_color=STATE_COLORS[state],
-            hovertemplate="<b>%{x}</b><br>Peak: %{y:.2f} kWh/1000 sqft<extra></extra>",
-        ))
+        for ulabel in upgrade_labels:
+            sub = peak[
+                (peak["county_label"] == county) & (peak["upgrade_label"] == ulabel)
+            ].set_index(BTYPE_COL)
+            fig.add_trace(go.Bar(
+                name=f"{county} — {ulabel}",
+                x=btypes,
+                y=[sub.loc[b, SITE_COL] if b in sub.index else 0 for b in btypes],
+                marker_color=STATE_COLORS[state],
+                opacity=UPGRADE_OPACITY[next(k for k, v in UPGRADE_LABELS.items() if v == ulabel)],
+                hovertemplate=f"<b>%{{x}}</b><br>{county} ({ulabel})<br>Peak: %{{y:.2f}} kWh/1000 sqft<extra></extra>",
+            ))
 
     fig.update_layout(
-        title="Peak 15-min Site Energy Intensity by Building Type and County",
+        title="Peak 15-min Site Energy Intensity by Building Type, County, and Scenario",
         barmode="group",
         xaxis_title="Building Type",
         yaxis_title="Peak 15-min site energy (kWh/1000 sqft)",
         xaxis_tickangle=-35,
         template="plotly_white",
-        legend_title="County",
-        height=460,
+        legend_title="County / Scenario",
+        height=480,
     )
     return fig
 
 
 def fig_monthly_site(df: pd.DataFrame) -> go.Figure:
-    """Stacked bar: monthly total site energy intensity by state."""
+    """Line chart: monthly total site energy intensity by state × upgrade."""
     monthly = (
-        df.groupby(["state", "month"])[SITE_COL]
+        df.groupby(["state", UPGRADE_COL, "month"])[SITE_COL]
         .sum()
         .reset_index()
     )
@@ -155,127 +167,161 @@ def fig_monthly_site(df: pd.DataFrame) -> go.Figure:
 
     fig = go.Figure()
     for state in sorted(df["state"].unique()):
-        sub = monthly[monthly["state"] == state].set_index("month_abbr")
-        fig.add_trace(go.Bar(
-            name=state,
-            x=month_order,
-            y=[sub.loc[m, SITE_COL] if m in sub.index else 0 for m in month_order],
-            marker_color=STATE_COLORS[state],
-            hovertemplate=f"<b>%{{x}}</b> — {state}<br>Total: %{{y:.2f}} kWh/1000 sqft<extra></extra>",
-        ))
+        for upgrade_id in sorted(df[UPGRADE_COL].unique()):
+            ulabel = UPGRADE_LABELS[upgrade_id]
+            sub = monthly[
+                (monthly["state"] == state) & (monthly[UPGRADE_COL] == upgrade_id)
+            ].set_index("month_abbr")
+            fig.add_trace(go.Scatter(
+                name=f"{state} — {ulabel}",
+                x=month_order,
+                y=[sub.loc[m, SITE_COL] if m in sub.index else 0 for m in month_order],
+                mode="lines+markers",
+                line={"color": STATE_COLORS[state], "width": 2,
+                      "dash": UPGRADE_DASH[upgrade_id]},
+                marker={"size": 5},
+                opacity=UPGRADE_OPACITY[upgrade_id],
+                hovertemplate=f"<b>%{{x}}</b> — {state} ({ulabel})<br>Total: %{{y:.2f}} kWh/1000 sqft<extra></extra>",
+            ))
 
     fig.update_layout(
-        title="Monthly Total Site Energy Intensity by State (2018)",
-        barmode="stack",
+        title="Monthly Total Site Energy Intensity by State and Scenario (2018)",
         xaxis_title="Month",
         yaxis_title="Total site energy (kWh/1000 sqft)",
         template="plotly_white",
-        legend_title="State",
+        legend_title="State / Scenario",
         height=430,
     )
     return fig
 
 
 def fig_hourly_electricity(df: pd.DataFrame) -> go.Figure:
-    """Line chart: mean hourly electricity intensity by state."""
-    hourly = df.groupby(["state", "hour"])[ELEC_COL].mean().reset_index()
+    """Line chart: mean hourly electricity intensity by state × upgrade."""
+    hourly = df.groupby(["state", UPGRADE_COL, "hour"])[ELEC_COL].mean().reset_index()
 
     fig = go.Figure()
     for state in sorted(df["state"].unique()):
-        sub = hourly[hourly["state"] == state]
-        fig.add_trace(go.Scatter(
-            x=sub["hour"],
-            y=sub[ELEC_COL],
-            name=state,
-            mode="lines+markers",
-            line={"color": STATE_COLORS[state], "width": 2},
-            marker={"size": 5},
-            hovertemplate="Hour %{x}:00<br>Mean electricity: %{y:.2f} kWh/1000 sqft<extra></extra>",
-        ))
+        for upgrade_id in sorted(df[UPGRADE_COL].unique()):
+            ulabel = UPGRADE_LABELS[upgrade_id]
+            sub = hourly[(hourly["state"] == state) & (hourly[UPGRADE_COL] == upgrade_id)]
+            fig.add_trace(go.Scatter(
+                x=sub["hour"],
+                y=sub[ELEC_COL],
+                name=f"{state} — {ulabel}",
+                mode="lines+markers",
+                line={"color": STATE_COLORS[state], "width": 2,
+                      "dash": UPGRADE_DASH[upgrade_id]},
+                marker={"size": 5},
+                opacity=UPGRADE_OPACITY[upgrade_id],
+                hovertemplate=f"Hour %{{x}}:00 ({ulabel})<br>Mean electricity: %{{y:.2f}} kWh/1000 sqft<extra></extra>",
+            ))
 
     fig.update_layout(
-        title="Mean Hourly Electricity Intensity Profile by State",
+        title="Mean Hourly Electricity Intensity Profile by State and Scenario",
         xaxis_title="Hour of day",
         yaxis_title="Mean electricity (kWh/1000 sqft per 15-min interval)",
         xaxis={"tickmode": "linear", "dtick": 2},
         template="plotly_white",
-        legend_title="State",
+        legend_title="State / Scenario",
         height=420,
     )
     return fig
 
 
 def fig_energy_mix(df: pd.DataFrame) -> go.Figure:
-    """Stacked bar: annual energy mix by county."""
+    """Stacked bar: annual energy mix by county × upgrade."""
     counties = list(COUNTY_LABELS.values())
+    upgrade_labels = [UPGRADE_LABELS[u] for u in sorted(UPGRADE_LABELS)]
+    x_labels = [f"{c}<br>{ul}" for c in counties for ul in upgrade_labels]
+
     fig = go.Figure()
     for (fuel, col), color in zip(FUEL_COLS.items(), FUEL_COLORS):
         if col not in df.columns:
             continue
-        totals = [df[df["county_label"] == c][col].sum() for c in counties]
+        vals = []
+        for c in counties:
+            for ulabel in upgrade_labels:
+                uid = next(k for k, v in UPGRADE_LABELS.items() if v == ulabel)
+                vals.append(
+                    df[(df["county_label"] == c) & (df[UPGRADE_COL] == uid)][col].sum()
+                )
         fig.add_trace(go.Bar(
             name=fuel,
-            x=counties,
-            y=totals,
+            x=x_labels,
+            y=vals,
             marker_color=color,
             hovertemplate=f"<b>{fuel}</b><br>%{{x}}<br>Annual: %{{y:.2f}} kWh/1000 sqft<extra></extra>",
         ))
 
     fig.update_layout(
-        title="Annual Energy Intensity Mix by County (2018)",
+        title="Annual Energy Intensity Mix by County and Scenario (2018)",
         barmode="stack",
-        xaxis_title="County",
+        xaxis_title="County / Scenario",
         yaxis_title="Annual energy intensity (kWh/1000 sqft)",
         template="plotly_white",
         legend_title="Fuel Type",
-        height=430,
+        height=450,
     )
     return fig
 
 
 def fig_seasonal_heatmap(df: pd.DataFrame) -> go.Figure:
-    """Heatmap subplots: peak site energy intensity by building type x season."""
+    """Heatmap subplots: peak site energy intensity by building type x season.
+
+    Layout: 2 rows (Baseline, Package 3) × 3 columns (one per county).
+    """
     seasons = ["Winter", "Spring", "Summer", "Fall"]
     counties = list(COUNTY_LABELS.values())
+    upgrade_labels = [UPGRADE_LABELS[u] for u in sorted(UPGRADE_LABELS)]
+
+    subplot_titles = [
+        f"{county}<br>{ulabel}"
+        for ulabel in upgrade_labels
+        for county in counties
+    ]
 
     fig = make_subplots(
-        rows=1, cols=3,
-        subplot_titles=counties,
-        horizontal_spacing=0.08,
+        rows=len(upgrade_labels), cols=len(counties),
+        subplot_titles=subplot_titles,
+        horizontal_spacing=0.06,
+        vertical_spacing=0.12,
     )
 
-    for col_idx, county in enumerate(counties, start=1):
-        sub = df[df["county_label"] == county]
-        if sub.empty:
-            continue
-        peak = sub.groupby([BTYPE_COL, "season"])[SITE_COL].max().unstack("season")
-        peak = peak.reindex(columns=seasons)
-        peak = peak.dropna(how="all")
+    n_cols = len(counties)
+    for row_idx, ulabel in enumerate(upgrade_labels, start=1):
+        uid = next(k for k, v in UPGRADE_LABELS.items() if v == ulabel)
+        for col_idx, county in enumerate(counties, start=1):
+            sub = df[(df["county_label"] == county) & (df[UPGRADE_COL] == uid)]
+            if sub.empty:
+                continue
+            peak = sub.groupby([BTYPE_COL, "season"])[SITE_COL].max().unstack("season")
+            peak = peak.reindex(columns=seasons).dropna(how="all")
 
-        row_max = peak.max(axis=1).replace(0, 1)
-        peak_norm = peak.div(row_max, axis=0)
+            row_max = peak.max(axis=1).replace(0, 1)
+            peak_norm = peak.div(row_max, axis=0)
+            show_cb = (col_idx == n_cols) and (row_idx == 1)
 
-        fig.add_trace(
-            go.Heatmap(
-                z=peak_norm.values,
-                x=seasons,
-                y=list(peak_norm.index),
-                colorscale="YlOrRd",
-                showscale=(col_idx == 3),
-                colorbar={"title": "Normalised<br>peak", "x": 1.02} if col_idx == 3 else {},
-                hovertemplate=(
-                    "Season: %{x}<br>Building: %{y}<br>"
-                    "Normalised peak: %{z:.2f}<extra></extra>"
+            fig.add_trace(
+                go.Heatmap(
+                    z=peak_norm.values,
+                    x=seasons,
+                    y=list(peak_norm.index),
+                    colorscale="YlOrRd",
+                    showscale=show_cb,
+                    colorbar={"title": "Normalised<br>peak", "x": 1.02} if show_cb else {},
+                    hovertemplate=(
+                        "Season: %{x}<br>Building: %{y}<br>"
+                        "Normalised peak: %{z:.2f}<extra></extra>"
+                    ),
                 ),
-            ),
-            row=1, col=col_idx,
-        )
+                row=row_idx, col=col_idx,
+            )
 
     fig.update_layout(
-        title="Peak Site Energy Intensity: Building Type x Season<br>"
+        title="Peak Site Energy Intensity: Building Type × Season × Scenario<br>"
               "<sup>Colour normalised within each building type (1.0 = highest season)</sup>",
         template="plotly_white",
-        height=480,
+        height=800,
     )
     return fig
 
@@ -283,12 +329,13 @@ def fig_seasonal_heatmap(df: pd.DataFrame) -> go.Figure:
 def fig_top10_peaks(df: pd.DataFrame) -> go.Figure:
     """Bar chart: top 10 peak 15-min site energy intensity intervals."""
     top10 = df.nlargest(10, SITE_COL)[
-        ["timestamp", "state", COUNTY_COL, BTYPE_COL, SITE_COL]
+        ["timestamp", "state", COUNTY_COL, UPGRADE_COL, BTYPE_COL, SITE_COL]
     ].reset_index(drop=True)
     top10["county_label"] = top10[COUNTY_COL].map(COUNTY_LABELS)
+    top10["upgrade_label"] = top10[UPGRADE_COL].map(UPGRADE_LABELS)
     top10["label"] = (
         top10[BTYPE_COL] + "<br>"
-        + top10["county_label"] + "<br>"
+        + top10["county_label"] + " (" + top10["upgrade_label"] + ")<br>"
         + top10["timestamp"].dt.strftime("%b %d, %H:%M")
     )
     colors = [STATE_COLORS.get(s, "gray") for s in top10["state"]]
@@ -358,18 +405,19 @@ def build_html(df: pd.DataFrame, stats: pd.DataFrame, generated_date: str) -> st
     # --- Computed values for narrative ---
     n_rows = len(df)
     states = sorted(df["state"].unique())
+    upgrades = sorted(df[UPGRADE_COL].unique())
     btype_list = sorted(df[BTYPE_COL].unique())
-    btype_per_state = df.groupby("state")[BTYPE_COL].nunique().to_dict()
+    btype_per_state = df[df[UPGRADE_COL] == 0].groupby("state")[BTYPE_COL].nunique().to_dict()
     ts_min = df["timestamp"].min().strftime("%Y-%m-%d")
     ts_max = df["timestamp"].max().strftime("%Y-%m-%d")
-    n_groups = df.groupby(["state", COUNTY_COL, BTYPE_COL]).ngroups
+    n_groups = df.groupby(["state", UPGRADE_COL, COUNTY_COL, BTYPE_COL]).ngroups
 
-    state_stats = df.groupby("state")[SITE_COL].agg(["mean", "max", "sum"]).round(2)
+    state_stats = df.groupby(["state", UPGRADE_COL])[SITE_COL].agg(["mean", "max", "sum"]).round(2)
 
     peak_row = df.loc[df[SITE_COL].idxmax()]
 
     hourly_peak = (
-        df.groupby(["state", "hour"])[ELEC_COL]
+        df[df[UPGRADE_COL] == 0].groupby(["state", "hour"])[ELEC_COL]
         .mean()
         .reset_index()
         .sort_values(ELEC_COL, ascending=False)
@@ -378,7 +426,11 @@ def build_html(df: pd.DataFrame, stats: pd.DataFrame, generated_date: str) -> st
         .reset_index()
     )
 
-    elec_share = df.groupby("county_label")[[ELEC_COL, GAS_COL, SITE_COL]].sum()
+    elec_share = (
+        df[df[UPGRADE_COL] == 0]
+        .groupby("county_label")[[ELEC_COL, GAS_COL, SITE_COL]]
+        .sum()
+    )
     elec_share["elec_pct"] = (elec_share[ELEC_COL] / elec_share[SITE_COL] * 100).round(1)
     elec_share["gas_pct"] = (elec_share[GAS_COL] / elec_share[SITE_COL] * 100).round(1)
 
@@ -386,38 +438,44 @@ def build_html(df: pd.DataFrame, stats: pd.DataFrame, generated_date: str) -> st
 
     # --- Summary stats table ---
     state_stats_display = state_stats.copy().reset_index()
-    state_stats_display.columns = ["State", "Mean (kWh/1000 sqft)", "Peak (kWh/1000 sqft)", "Sum (kWh/1000 sqft)"]
+    state_stats_display[UPGRADE_COL] = state_stats_display[UPGRADE_COL].map(UPGRADE_LABELS)
+    state_stats_display.columns = ["State", "Scenario", "Mean (kWh/1000 sqft)",
+                                   "Peak (kWh/1000 sqft)", "Sum (kWh/1000 sqft)"]
 
-    # --- Building rankings per county ---
+    # --- Building rankings per county × upgrade ---
     rankings_html = ""
     for county_code, county_name in COUNTY_LABELS.items():
-        sub = stats[stats[COUNTY_COL] == county_code].sort_values(
-            "peak_kwh_per_1000sqft", ascending=False
-        )
-        rows = ""
-        for i, (_, r) in enumerate(sub.iterrows(), 1):
-            bg = "#f8f9fa" if i % 2 == 0 else "#ffffff"
-            rows += (
-                f'<tr style="background:{bg}">'
-                f'<td style="padding:5px 10px">{i}</td>'
-                f'<td style="padding:5px 10px">{r[BTYPE_COL]}</td>'
-                f'<td style="padding:5px 10px;text-align:right">{r["mean_kwh_per_1000sqft"]:.2f}</td>'
-                f'<td style="padding:5px 10px;text-align:right">{r["peak_kwh_per_1000sqft"]:.2f}</td>'
-                f'<td style="padding:5px 10px;text-align:right">{r["p95_kwh_per_1000sqft"]:.2f}</td>'
-                f'</tr>'
-            )
-        rankings_html += f"""
-        <h3>{county_name}</h3>
-        <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:16px">
-          <thead><tr style="background:#343a40;color:#fff">
-            <th style="padding:6px 10px">#</th>
-            <th style="padding:6px 10px">Building Type</th>
-            <th style="padding:6px 10px;text-align:right">Mean (kWh/1000 sqft)</th>
-            <th style="padding:6px 10px;text-align:right">Peak (kWh/1000 sqft)</th>
-            <th style="padding:6px 10px;text-align:right">P95 (kWh/1000 sqft)</th>
-          </tr></thead>
-          <tbody>{rows}</tbody>
-        </table>"""
+        for upgrade_id in sorted(upgrades):
+            ulabel = UPGRADE_LABELS[upgrade_id]
+            sub = stats[
+                (stats[COUNTY_COL] == county_code) & (stats[UPGRADE_COL] == upgrade_id)
+            ].sort_values("peak_kwh_per_1000sqft", ascending=False)
+            if sub.empty:
+                continue
+            rows = ""
+            for i, (_, r) in enumerate(sub.iterrows(), 1):
+                bg = "#f8f9fa" if i % 2 == 0 else "#ffffff"
+                rows += (
+                    f'<tr style="background:{bg}">'
+                    f'<td style="padding:5px 10px">{i}</td>'
+                    f'<td style="padding:5px 10px">{r[BTYPE_COL]}</td>'
+                    f'<td style="padding:5px 10px;text-align:right">{r["mean_kwh_per_1000sqft"]:.2f}</td>'
+                    f'<td style="padding:5px 10px;text-align:right">{r["peak_kwh_per_1000sqft"]:.2f}</td>'
+                    f'<td style="padding:5px 10px;text-align:right">{r["p95_kwh_per_1000sqft"]:.2f}</td>'
+                    f'</tr>'
+                )
+            rankings_html += f"""
+            <h3>{county_name} — {ulabel}</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:16px">
+              <thead><tr style="background:#343a40;color:#fff">
+                <th style="padding:6px 10px">#</th>
+                <th style="padding:6px 10px">Building Type</th>
+                <th style="padding:6px 10px;text-align:right">Mean (kWh/1000 sqft)</th>
+                <th style="padding:6px 10px;text-align:right">Peak (kWh/1000 sqft)</th>
+                <th style="padding:6px 10px;text-align:right">P95 (kWh/1000 sqft)</th>
+              </tr></thead>
+              <tbody>{rows}</tbody>
+            </table>"""
 
     # --- Energy mix table ---
     mix_rows = ""
@@ -507,67 +565,65 @@ def build_html(df: pd.DataFrame, stats: pd.DataFrame, generated_date: str) -> st
 <h2>1. Dataset Overview</h2>
 <dl class="kv">
   <dt>Total rows</dt>          <dd>{n_rows:,}</dd>
-  <dt>County × building groups</dt> <dd>{n_groups}</dd>
+  <dt>County × building × upgrade groups</dt> <dd>{n_groups}</dd>
   <dt>Timestamp range</dt>     <dd>{ts_min} to {ts_max}</dd>
   <dt>Interval</dt>            <dd>15-minute</dd>
   <dt>States</dt>              <dd>{", ".join(states)}</dd>
+  <dt>Scenarios</dt>           <dd>{", ".join(UPGRADE_LABELS.get(u, str(u)) for u in upgrades)}</dd>
   <dt>Energy unit</dt>         <dd>kWh per 1000 square feet per 15-min interval</dd>
   <dt>Null values</dt>         <dd>{null_total}</dd>
 </dl>
+<div class="note">
+  Two scenarios are included: <strong>Baseline (upgrade 0)</strong> — existing 2018 building stock,
+  and <strong>Package 3 (upgrade 36)</strong> — an efficiency measure package applied to the same
+  building stock. Charts show both scenarios; solid lines / full-opacity bars = Baseline,
+  dashed lines / lower-opacity bars = Package 3.
+</div>
 
 <h3>Building types ({len(btype_list)})</h3>
 <ul>{btype_list_html}</ul>
 
-<h3>Coverage by state</h3>
+<h3>Coverage by state (Baseline)</h3>
 <ul>{state_coverage_html}</ul>
-<div class="note">
-  CO (San Juan County) had only {btype_per_state.get("CO", "—")} building types compared to
-  {btype_per_state.get("CA", "—")} for CA and {btype_per_state.get("MI", "—")} for MI, reflecting
-  San Juan County's small commercial building stock.
-</div>
 
-<h2>2. Site Energy Intensity — Summary by State</h2>
+<h2>2. Site Energy Intensity — Summary by State and Scenario</h2>
 <p>All values in kWh/1000 sqft per 15-min interval. After normalising by
 <code>floor_area_represented</code>, values are comparable across counties.</p>
 {df_to_html_table(state_stats_display)}
 
-<h2>3. Peak 15-Minute Interval</h2>
+<h2>3. Peak 15-Minute Interval (across all scenarios)</h2>
 <dl class="kv">
   <dt>Peak value</dt>      <dd>{peak_row[SITE_COL]:.2f} kWh/1000 sqft</dd>
   <dt>Timestamp</dt>       <dd>{peak_row["timestamp"]}</dd>
   <dt>State</dt>           <dd>{peak_row["state"]}</dd>
   <dt>County</dt>          <dd>{COUNTY_LABELS.get(peak_row[COUNTY_COL], peak_row[COUNTY_COL])}</dd>
   <dt>Building type</dt>   <dd>{peak_row[BTYPE_COL]}</dd>
+  <dt>Scenario</dt>        <dd>{UPGRADE_LABELS.get(peak_row[UPGRADE_COL], str(peak_row[UPGRADE_COL]))}</dd>
 </dl>
 
-<h2>4. Peak Energy Intensity by Building Type and County</h2>
+<h2>4. Peak Energy Intensity by Building Type, County, and Scenario</h2>
 <div class="fig-wrap">{figures["fig-peak"]}</div>
 
-<h2>5. Monthly Total Site Energy Intensity</h2>
+<h2>5. Monthly Total Site Energy Intensity by Scenario</h2>
 <div class="fig-wrap">{figures["fig-monthly"]}</div>
 
-<h2>6. Mean Hourly Electricity Intensity Profile</h2>
+<h2>6. Mean Hourly Electricity Intensity Profile by Scenario</h2>
 <div class="fig-wrap">{figures["fig-hourly"]}</div>
-<h3>Peak electricity hour by state</h3>
+<h3>Peak electricity hour by state (Baseline)</h3>
 <ul>{hourly_peak_html}</ul>
-<div class="note">
-  CA and CO peak electricity intensity appeared to occur in the early-to-mid afternoon.
-  MI showed an earlier midday peak, which may be associated with heating loads in
-  colder months.
-</div>
 
-<h2>7. Annual Energy Mix by County</h2>
+<h2>7. Annual Energy Mix by County and Scenario</h2>
 <div class="fig-wrap">{figures["fig-mix"]}</div>
-<h3>Electricity and natural gas share of site energy</h3>
+<h3>Electricity and natural gas share of site energy (Baseline)</h3>
 {mix_table}
 
-<h2>8. Seasonal Peak Energy Intensity</h2>
+<h2>8. Seasonal Peak Energy Intensity by Scenario</h2>
 <div class="fig-wrap">{figures["fig-seasonal"]}</div>
 
 <h2>9. Top 10 Peak 15-min Intervals</h2>
 <div class="fig-wrap">{figures["fig-top10"]}</div>
 
-<h2>10. Building Type Rankings by County</h2>
+<h2>10. Building Type Rankings by County and Scenario</h2>
 <p>Ranked by peak 15-min site energy intensity (kWh/1000 sqft).</p>
 {rankings_html}
 
