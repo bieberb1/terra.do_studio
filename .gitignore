@@ -1,3 +1,7 @@
+# Large generated figures (> 5 MB) — too large for GitHub
+# Regenerate with: python src/demand.py
+reports/figures/fig_load_duration.html
+
 # CSV files
 *.csv
 
