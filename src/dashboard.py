@@ -527,6 +527,19 @@ def chart_top_peaks(df: pd.DataFrame) -> go.Figure:
 def compute_kpis(df: pd.DataFrame) -> dict:
     peak_row = df.loc[df[SITE_COL].idxmax()]
     upgrades = sorted(df[UPGRADE_COL].unique())
+
+    # Load factor: mean / peak per group (baseline only, all counties averaged)
+    base = df[df[UPGRADE_COL] == 0]
+    lf = (
+        base.groupby([COUNTY_COL, BTYPE_COL])[SITE_COL]
+        .agg(mean_val="mean", peak_val="max")
+        .assign(load_factor=lambda x: x["mean_val"] / x["peak_val"])
+    )
+    spikiest = lf["load_factor"].idxmin()  # (county_code, btype) tuple
+    spikiest_lf = lf.loc[spikiest, "load_factor"]
+    spikiest_county = COUNTY_LABELS.get(spikiest[0], spikiest[0])
+    spikiest_btype = spikiest[1]
+
     return {
         "total_rows": f"{len(df):,}",
         "date_range": f"{df['timestamp'].min().strftime('%b %d, %Y')} – {df['timestamp'].max().strftime('%b %d, %Y')}",
@@ -537,6 +550,8 @@ def compute_kpis(df: pd.DataFrame) -> dict:
         "peak_where": f"{peak_row[BTYPE_COL]}, {COUNTY_LABELS.get(peak_row[COUNTY_COL], peak_row[COUNTY_COL])} ({UPGRADE_LABELS.get(peak_row[UPGRADE_COL], str(peak_row[UPGRADE_COL]))})",
         "peak_when": peak_row["timestamp"].strftime("%b %d, %H:%M"),
         "null_count": str(int(df.isnull().sum().sum())),
+        "spikiest_lf": f"{spikiest_lf:.3f}",
+        "spikiest_where": f"{spikiest_btype}, {spikiest_county}",
     }
 
 
@@ -569,6 +584,8 @@ def build_html(
             ("Overall peak", kpis["peak_val"]),
             ("Peak location", kpis["peak_where"]),
             ("Peak time", kpis["peak_when"]),
+            ("Spikiest load factor (baseline)", kpis["spikiest_lf"]),
+            ("Spikiest building type", kpis["spikiest_where"]),
         ]
     )
 

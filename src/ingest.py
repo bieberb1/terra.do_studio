@@ -11,7 +11,7 @@ Requirements:
 
 Usage:
     python ingest.py
-
+ 
 Notes:
     - Energy consumption values are kWh per 15-minute timestep.
     - All timestamps are in U.S. Eastern Standard Time regardless of building location.
@@ -19,9 +19,8 @@ Notes:
     - Upgrade IDs change across releases. Use measure_name_crosswalk.csv to map them.
  
 Upgrade scenarios (2024 Release 2):
-    - Upgrade 0 = Baseline (existing building stock as of 2018)
-    - Upgrade 36 = Package 3: LED Lighting + HP-RTU Standard Performance + ASHP Boiler
-    - Upgrades 1-26+ = Other energy efficiency / electrification measures
+    - Upgrade 0  = Baseline (existing building stock as of 2018)
+    - Upgrade 35 = Package 2: LED Lighting + HP RTU (original fuel backup) + ASHP Boiler (gas backup)
     - Check upgrades_lookup.json (downloaded to data/raw/) for the full mapping.
     - Individual upgrade results should NOT be summed (see ComStock documentation).
 """
@@ -46,13 +45,13 @@ DATASET_PATH = f"s3://{BUCKET}/{BASE_PATH}/{DATASET_YEAR}/{DATASET_NAME}"
  
 # Upgrade scenarios to download.
 # 0  = baseline (existing stock)
-# 36 = Package 3: LED Lighting + HP-RTU Standard Performance + ASHP Boiler
-UPGRADE_IDS = [0, 36]
+# 35 = Package 2: LED Lighting + HP RTU (original fuel backup) + ASHP Boiler (gas backup)
+UPGRADE_IDS = [0, 35]
  
 # Counties to download.
 # Format must match spatial_tract_lookup_table: "<state_abbrev>, <County Name>"
 COUNTIES = [
-    {"state": "CO", "county_label": "CO, Denver County"},
+    {"state": "CO", "county_label": "CO, San Juan County"},
     {"state": "MI", "county_label": "MI, Washtenaw County"},
     {"state": "CA", "county_label": "CA, Orange County"},
 ]
@@ -60,9 +59,52 @@ COUNTIES = [
 # Output directory
 OUTPUT_DIR = os.path.join(".", "data", "raw")
  
+# Reference files to download alongside the timeseries data
+REFERENCE_FILES = [
+    "upgrades_lookup.json",
+    "data_dictionary.tsv",
+    "enumeration_dictionary.tsv",
+]
+ 
 # =============================================================================
 # FUNCTIONS
 # =============================================================================
+ 
+def download_reference_files(s3_client, bucket, base_path, dataset_year, dataset_name, output_dir):
+    """
+    Download reference files (data dictionary, enumerations, upgrades lookup)
+    from the dataset root.
+ 
+    Parameters
+    ----------
+    s3_client : boto3 S3 client
+    bucket : str
+    base_path : str
+    dataset_year : str
+    dataset_name : str
+    output_dir : str
+ 
+    Returns
+    -------
+    int
+        Number of files successfully downloaded.
+    """
+    downloaded = 0
+    for filename in REFERENCE_FILES:
+        key = f"{base_path}/{dataset_year}/{dataset_name}/{filename}"
+        local_path = os.path.join(output_dir, filename)
+ 
+        print(f"  Downloading {filename}...")
+        try:
+            s3_client.download_file(bucket, key, local_path)
+            size_kb = os.path.getsize(local_path) / 1024
+            print(f"    Saved to {local_path} ({size_kb:.0f} KB)")
+            downloaded += 1
+        except Exception as e:
+            print(f"    WARNING: Could not download {filename}: {e}")
+ 
+    return downloaded
+ 
  
 def get_county_gisjoin_codes(dataset_path, counties):
     """
@@ -82,7 +124,7 @@ def get_county_gisjoin_codes(dataset_path, counties):
         Input dicts with 'gisjoin' key added (None if not found).
     """
     lookup_path = f"{dataset_path}/geographic_information/spatial_tract_lookup_table.csv"
-    print(f"Loading spatial tract lookup table...")
+    print("Loading spatial tract lookup table...")
     print(f"  Path: {lookup_path}")
  
     try:
@@ -140,56 +182,6 @@ def list_s3_objects(s3_client, bucket, prefix):
         for obj in page.get("Contents", []):
             keys.append(obj["Key"])
     return keys
- 
- 
-def download_upgrades_lookup(s3_client, bucket, base_path, dataset_year, dataset_name, output_dir):
-    """
-    Download the upgrades_lookup.json file to help identify upgrade IDs.
- 
-    Parameters
-    ----------
-    s3_client : boto3 S3 client
-    bucket : str
-    base_path : str
-    dataset_year : str
-    dataset_name : str
-    output_dir : str
- 
-    Returns
-    -------
-    dict or None
-        Parsed JSON contents, or None if download failed.
-    """
-    key = f"{base_path}/{dataset_year}/{dataset_name}/upgrades_lookup.json"
-    local_path = os.path.join(output_dir, "upgrades_lookup.json")
- 
-    print(f"Downloading upgrades_lookup.json...")
-    try:
-        s3_client.download_file(bucket, key, local_path)
-        with open(local_path, "r") as f:
-            data = json.load(f)
-        print(f"  Saved to {local_path}")
-        print(f"  {len(data)} upgrade(s) defined\n")
- 
-        # Print a summary of available upgrades
-        print("  Available upgrades:")
-        for uid, info in sorted(data.items(), key=lambda x: int(x[0])):
-            # The structure varies; try to extract a name
-            if isinstance(info, dict):
-                name = info.get("upgrade_name", info.get("name", str(info)))
-            else:
-                name = str(info)
-            # Truncate long names
-            if len(name) > 80:
-                name = name[:77] + "..."
-            print(f"    {uid}: {name}")
-        print()
- 
-        return data
-    except Exception as e:
-        print(f"  Could not download upgrades_lookup.json: {e}")
-        print(f"  Continuing without it.\n")
-        return None
  
  
 def download_county_upgrade(s3_client, bucket, agg_prefix, upgrade_id, county_info, output_dir):
@@ -277,9 +269,23 @@ def main():
         print("Anonymous access failed, using AWS credentials\n")
         s3 = boto3.client("s3")
  
-    # Step 1: Download upgrades lookup
-    print("--- Step 1: Downloading upgrade definitions ---\n")
-    download_upgrades_lookup(s3, BUCKET, BASE_PATH, DATASET_YEAR, DATASET_NAME, output_dir)
+    # Step 1: Download reference files
+    print("--- Step 1: Downloading reference files ---\n")
+    ref_count = download_reference_files(
+        s3, BUCKET, BASE_PATH, DATASET_YEAR, DATASET_NAME, output_dir
+    )
+    print(f"\n  {ref_count}/{len(REFERENCE_FILES)} reference file(s) downloaded\n")
+ 
+    # Print upgrade summary if lookup was downloaded
+    lookup_path = os.path.join(output_dir, "upgrades_lookup.json")
+    if os.path.exists(lookup_path):
+        with open(lookup_path, "r") as f:
+            upgrades = json.load(f)
+        print("  Available upgrades:")
+        for uid, name in sorted(upgrades.items(), key=lambda x: int(x[0])):
+            marker = " <--" if int(uid) in UPGRADE_IDS else ""
+            print(f"    {uid}: {name}{marker}")
+        print()
  
     # Step 2: Look up GISJOIN codes
     print("--- Step 2: Looking up county GISJOIN codes ---\n")
@@ -289,7 +295,7 @@ def main():
         return
  
     # Step 3: Download aggregate files for each county x upgrade combination
-    print(f"\n--- Step 3: Downloading aggregate files ---")
+    print("\n--- Step 3: Downloading aggregate files ---")
     print(f"  Upgrades: {UPGRADE_IDS}")
     print(f"  Counties: {[c['county_label'] for c in counties if c.get('gisjoin')]}\n")
  
@@ -309,22 +315,24 @@ def main():
  
     # Summary
     print(f"\n{'='*60}")
-    print(f"Done. Downloaded {total} file(s) to {output_dir}")
+    print(f"Done. Downloaded {total} timeseries file(s) + {ref_count} reference file(s)")
     print(f"{'='*60}")
  
     if total > 0:
-        print(f"\nFile organization:")
-        print(f"  data/raw/")
-        print(f"    upgrades_lookup.json  <- upgrade ID definitions")
-        print(f"    <state>_<gisjoin>/")
+        print("\nFile organization:")
+        print("  data/raw/")
+        print("    data_dictionary.tsv       <- column definitions")
+        print("    enumeration_dictionary.tsv <- enumeration values")
+        print("    upgrades_lookup.json       <- upgrade ID definitions")
+        print("    <state>_<gisjoin>/")
         for uid in UPGRADE_IDS:
-            label = "baseline" if uid == 0 else f"upgrade scenario"
-            print(f"      upgrade_{uid}/        <- {label}")
-        print(f"\nReminders:")
-        print(f"  - Energy values are kWh per 15-min timestep (summed across all buildings)")
-        print(f"  - Timestamps are U.S. Eastern Standard Time")
-        print(f"  - Check 'models_used' column for sample size")
-        print(f"  - Do NOT sum individual upgrade savings (see ComStock docs)")
+            label = "baseline" if uid == 0 else "upgrade scenario"
+            print(f"      upgrade_{uid}/            <- {label}")
+        print("\nReminders:")
+        print("  - Energy values are kWh per 15-min timestep (summed across all buildings)")
+        print("  - Timestamps are U.S. Eastern Standard Time")
+        print("  - Check 'models_used' column for sample size")
+        print("  - Do NOT sum individual upgrade savings (see ComStock docs)")
  
  
 if __name__ == "__main__":

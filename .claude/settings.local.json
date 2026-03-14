@@ -38,7 +38,30 @@
       "Bash(sed -i 's|kWh/sqft per|kWh/1000 sqft per|g' src/eda.py src/qa.py src/dashboard.py)",
       "Bash(python -m ruff check src/qa.py src/dashboard.py)",
       "Bash(ls -la \"c:\\\\Users\\\\bbieber\\\\GitHub\\\\terra.do_studio\"\" 2>/dev/null | grep -E \"^d \")",
-      "Bash(python -m ruff check src/clean.py src/eda.py src/qa.py src/dashboard.py)"
+      "Bash(python -m ruff check src/clean.py src/eda.py src/qa.py src/dashboard.py)",
+      "Bash(python \"c:/Users/bbieber/GitHub/terra.do_studio/src/eda.py\")",
+      "Bash(python \"c:/Users/bbieber/GitHub/terra.do_studio/src/qa.py\")",
+      "Bash(python \"c:/Users/bbieber/GitHub/terra.do_studio/src/dashboard.py\")",
+      "WebFetch(domain:natlabrockies.github.io)",
+      "Bash(head -2 \"c:/Users/bbieber/GitHub/terra.do_studio/data/raw/CA_G0600590/upgrade_0/\"*.csv)",
+      "Bash(python -:*)",
+      "Bash(.venv/Scripts/jupyter nbconvert:*)",
+      "Bash(find c:/Users/bbieber/GitHub/terra.do_studio/.venv -name jupyter*)",
+      "Bash(find c:/Users/bbieber/GitHub/terra.do_studio/.venv -name nbconvert* -o -name jupyter.exe)",
+      "Bash(python -c \"import duckdb; print\\(''duckdb'', duckdb.__version__\\)\")",
+      "Bash(python -c \"import nbformat; print\\(''nbformat ok''\\)\")",
+      "Bash(\"c:/Users/bbieber/GitHub/terra.do_studio/.venv/Scripts/python.exe\" -c \"import duckdb; print\\(''''duckdb'''', duckdb.__version__\\)\")",
+      "Bash(\"c:/Users/bbieber/GitHub/terra.do_studio/.venv/Scripts/python.exe\" -m pip show jupyter nbconvert)",
+      "Bash(find c:/Users/bbieber/GitHub/terra.do_studio/.venv -name python*.exe)",
+      "Bash(\"c:/Users/bbieber/GitHub/terra.do_studio/.venv/Scripts/python.exe\" -m pip list)",
+      "Bash(\"c:/Users/bbieber/GitHub/terra.do_studio/.venv/Scripts/python.exe\" -m pip install duckdb jupyter nbconvert ipykernel)",
+      "Bash(\"c:/Users/bbieber/GitHub/terra.do_studio/.venv/Scripts/python.exe\" -m nbconvert --to notebook --execute \"c:/Users/bbieber/GitHub/terra.do_studio/notebooks/spotcheck_mi_largeoffice.ipynb\" --output \"c:/Users/bbieber/GitHub/terra.do_studio/notebooks/spotcheck_mi_largeoffice.ipynb\")",
+      "Bash(\"c:/Users/bbieber/GitHub/terra.do_studio/.venv/Scripts/python.exe\" -m nbconvert --to notebook --execute \"c:/Users/bbieber/GitHub/terra.do_studio/notebooks/spotcheck_mi_largeoffice.ipynb\" --output \"c:/Users/bbieber/GitHub/terra.do_studio/notebooks/spotcheck_mi_largeoffice.ipynb\" --ExecutePreprocessor.timeout=120)",
+      "Bash(\"c:/Users/bbieber/GitHub/terra.do_studio/.venv/Scripts/python.exe\" -:*)",
+      "Bash(python src/demand.py)",
+      "Bash(python -m ruff check src/eda.py src/demand.py src/dashboard.py)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -m pip install pytest -q)"
     ]
   }
 }

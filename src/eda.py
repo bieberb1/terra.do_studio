@@ -104,8 +104,14 @@ def compute_stats(df: pd.DataFrame) -> pd.DataFrame:
     )
     stats["county_label"] = stats[COUNTY_COL].map(COUNTY_LABELS)
     stats["upgrade_label"] = stats[UPGRADE_COL].map(UPGRADE_LABELS)
-    stats.to_csv(STATS_CSV, index=False)
-    print(f"Saved stats -> {STATS_CSV}")
+    stats["load_factor"] = stats["mean_kwh_per_1000sqft"] / stats["peak_kwh_per_1000sqft"]
+    try:
+        stats.to_csv(STATS_CSV, index=False)
+        print(f"Saved stats -> {STATS_CSV}")
+    except PermissionError:
+        alt = STATS_CSV.replace(".csv", "_new.csv")
+        stats.to_csv(alt, index=False)
+        print(f"WARNING: {STATS_CSV} is locked (close it in Excel). Wrote to {alt} instead.")
     return stats
 
 
@@ -462,6 +468,7 @@ def build_html(df: pd.DataFrame, stats: pd.DataFrame, generated_date: str) -> st
                     f'<td style="padding:5px 10px;text-align:right">{r["mean_kwh_per_1000sqft"]:.2f}</td>'
                     f'<td style="padding:5px 10px;text-align:right">{r["peak_kwh_per_1000sqft"]:.2f}</td>'
                     f'<td style="padding:5px 10px;text-align:right">{r["p95_kwh_per_1000sqft"]:.2f}</td>'
+                    f'<td style="padding:5px 10px;text-align:right">{r["load_factor"]:.3f}</td>'
                     f'</tr>'
                 )
             rankings_html += f"""
@@ -473,6 +480,7 @@ def build_html(df: pd.DataFrame, stats: pd.DataFrame, generated_date: str) -> st
                 <th style="padding:6px 10px;text-align:right">Mean (kWh/1000 sqft)</th>
                 <th style="padding:6px 10px;text-align:right">Peak (kWh/1000 sqft)</th>
                 <th style="padding:6px 10px;text-align:right">P95 (kWh/1000 sqft)</th>
+                <th style="padding:6px 10px;text-align:right">Load Factor</th>
               </tr></thead>
               <tbody>{rows}</tbody>
             </table>"""
